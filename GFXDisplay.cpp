@@ -6,6 +6,7 @@
 const int GFXDisplay::FONT_WIDTH = ::FONT_WIDTH;
 const int GFXDisplay::FONT_HEIGHT = ::FONT_HEIGHT;
 
+
 void GFXDisplay::clear()
 {
   memset(_buffer, 0, sizeof(_buffer));
@@ -13,41 +14,27 @@ void GFXDisplay::clear()
 
 void GFXDisplay::flush()
 {
-  // Copy the back buffer to screen
   draw(0, 0, 128, 8, _buffer);
 }
 
 void GFXDisplay::setPixel(int x, int y)
 {
-  // Simple clipping
-  if (x < 0 || x >= WIDTH || y < 0 || y > HEIGHT)
+  if (static_cast<unsigned>(x) >= WIDTH || static_cast<unsigned>(y) >= HEIGHT)
     return;
-
-  // Calc the byte idx we're going to update
-  int _byte = x + ((y >> 3) * WIDTH);
-
-  // Appears to be either a driver or firmware bug whereby byte 127 is written to column
-  // 0 on the display and everything else is shifted up one (so byte 0 is col 1 etc)
-  // Fix that here.. 
-  if (_byte % 128 == 0) {
-    _byte += 127;
-  }
-  else {
-    _byte -= 1;
-  }
-
-  // Set the corresponding bit
-  _buffer[_byte] |= 0x01 << (y % 8);
+  
+  // Calcul d'index optimisé (sans branchless compliqué)
+  int _byte = x + ((y >> 3) << 7);
+  _buffer[_byte] |= (1 << (y & 7));
 }
 
 void GFXDisplay::drawText(int x, int y, const char *s)
 {
-  // Font definition from front.h. Just replace to use a different font
   while (*s != 0) {
     char *c = font[(*s) - 0x20];
     for (int _y = 0; _y < FONT_HEIGHT; _y++) {
+      byte fontRow = c[_y];
       for (int _x = 0; _x < FONT_WIDTH; _x++) {
-        if (c[_y] & (0x01 << _x)) {
+        if (fontRow & (1 << _x)) {
           setPixel(x + _x, y + _y);
         }
       }
@@ -59,18 +46,16 @@ void GFXDisplay::drawText(int x, int y, const char *s)
 
 void GFXDisplay::drawLine(int x0, int y0, int x1, int y1)
 {
-  // With credit to https://gist.github.com/bert/1085538
+  int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+  int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+  int err = dx + dy, e2;
 
-  int dx =  abs (x1 - x0), sx = x0 < x1 ? 1 : -1;
-  int dy = -abs (y1 - y0), sy = y0 < y1 ? 1 : -1; 
-  int err = dx + dy, e2; /* error value e_xy */
-
-  for (;;){  /* loop */
+  while (true) {
     setPixel(x0, y0);
     if (x0 == x1 && y0 == y1) break;
-    e2 = 2 * err;
-    if (e2 >= dy) { err += dy; x0 += sx; } /* e_xy+e_x > 0 */
-    if (e2 <= dx) { err += dx; y0 += sy; } /* e_xy+e_y < 0 */
+    e2 = err << 1;  // e2 = 2 * err (shift plus rapide)
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
   }
 }
 
@@ -84,28 +69,83 @@ void GFXDisplay::drawRect(int x0, int y0, int x1, int y1)
 
 void GFXDisplay::drawCircle(int xm, int ym, int r)
 {
-  // With credit to https://gist.github.com/bert/1085538
+  int x = -r, y = 0, err = 2 - 2 * r;
 
-  int x = -r, y = 0, err = 2-2*r; /* II. Quadrant */ 
-  do {
-    setPixel(xm-x, ym+y); /*   I. Quadrant */
-    setPixel(xm-y, ym-x); /*  II. Quadrant */
-    setPixel(xm+x, ym-y); /* III. Quadrant */
-    setPixel(xm+y, ym+x); /*  IV. Quadrant */
-    r = err;
-    if (r >  x) err += ++x*2+1; /* e_xy+e_x > 0 */
-    if (r <= y) err += ++y*2+1; /* e_xy+e_y < 0 */
-  } while (x < 0);
+  while (x <= 0) {
+    // Dessiner 8 octants en une seule itération
+    setPixel(xm - x, ym + y);
+    setPixel(xm + x, ym + y);
+    setPixel(xm - y, ym - x);
+    setPixel(xm + y, ym - x);
+    setPixel(xm - y, ym + x);
+    setPixel(xm + y, ym + x);
+    setPixel(xm - x, ym - y);
+    setPixel(xm + x, ym - y);
+
+    int e2 = err;
+    if (e2 <= y) {
+      err += (++y << 1) + 1;
+    }
+    if (e2 > x || err > y) {
+      err += (++x << 1) + 1;
+    }
+  }
 }
 
 void GFXDisplay::drawBitmap(int x, int y, int w, int h, const byte *bmp)
 {
-  // bmp is an array of 0's and 1's *not* RGB values
-  // We definitely could be more efficient here
-
-  for (int i = 0; i < w * h; i++) {
-    if (bmp[i]) {
-      setPixel(x + (i % w), y + (i / w));
+  // Éviter les modulos en utilisant des index directs
+  const byte *p = bmp;
+  for (int row = 0; row < h; row++) {
+    for (int col = 0; col < w; col++) {
+      if (*p++) {
+        setPixel(x + col, y + row);
+      }
     }
   }
+}
+
+
+void GFXDisplay::drawCube3D(int centerX, int centerY, int size, float angleX, float angleY, float angleAnim) {
+    float half = size / 2.0f;
+    float vertices[8][3] = {
+        {-half, -half, -half}, {half, -half, -half}, {half, half, -half}, {-half, half, -half},
+        {-half, -half, half},  {half, -half, half},  {half, half, half},  {-half, half, half}
+    };
+
+    // Rotation animée autour Z
+    float cosA = cos(angleAnim), sinA = sin(angleAnim);
+
+    // Rotation X/Y
+    float cosX = cos(angleX), sinX = sin(angleX);
+    float cosY = cos(angleY), sinY = sin(angleY);
+
+    int projected[8][2];
+    for (int i = 0; i < 8; i++) {
+        float x = vertices[i][0], y = vertices[i][1], z = vertices[i][2];
+        // Rotation Z (animation)
+        float xz = x * cosA - y * sinA;
+        float yz = x * sinA + y * cosA;
+        // Rotation X
+        float y1 = yz * cosX - z * sinX;
+        float z1 = yz * sinX + z * cosX;
+        // Rotation Y
+        float x2 = xz * cosY + z1 * sinY;
+        float z2 = -xz * sinY + z1 * cosY;
+        // Projection 2D
+        float scale = 80.0f / (z2 + 120.0f);
+        projected[i][0] = centerX + int(x2 * scale);
+        projected[i][1] = centerY + int(y1 * scale);
+    }
+
+    int edges[12][2] = {
+        {0,1},{1,2},{2,3},{3,0},
+        {4,5},{5,6},{6,7},{7,4},
+        {0,4},{1,5},{2,6},{3,7}
+    };
+
+    for (int i = 0; i < 12; i++) {
+        drawLine(projected[edges[i][0]][0], projected[edges[i][0]][1],
+                         projected[edges[i][1]][0], projected[edges[i][1]][1]);
+    }
 }

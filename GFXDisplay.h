@@ -63,6 +63,8 @@ class GFXDisplay : public OLEDDisplay
      * bmp is an array of 1's or 0's
      */
     void drawBitmap(int x, int y, int w, int h, const byte *bmp);
+
+    void drawCube3D(int centerX, int centerY, int size, float angleX, float angleY, float angleAnim);
 };
 
 #endif
