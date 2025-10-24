@@ -73,6 +73,20 @@ void loop() {
      * bmp is an array of 1's or 0's
      */
     void drawBitmap(int x, int y, int w, int h, const byte *bmp);
+
+    /**
+     * @brief Draw a 3D rotating cube at position (centerX, centerY)
+     * @param centerX X coordinate of the cube center
+     * @param centerY Y coordinate of the cube center
+     * @param size Size of the cube (distance from center to vertex)
+     * @param angleX Rotation angle around X axis (in radians)
+     * @param angleY Rotation angle around Y axis (in radians)
+     * @param angleAnim Animation angle for continuous rotation around Z axis (in radians)
+     * 
+     * Example:
+     *   display.drawCube3D(64, 32, 20, 0.5f, 0.3f, 0.1f);
+     */
+    void drawCube3D(int centerX, int centerY, int size, float angleX, float angleY, float angleAnim);
 ```
 
 ## Acknowledgements
