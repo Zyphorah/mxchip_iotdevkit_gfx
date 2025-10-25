@@ -87,6 +87,15 @@ void loop() {
      *   display.drawCube3D(64, 32, 20, 0.5f, 0.3f, 0.1f);
      */
     void drawCube3D(int centerX, int centerY, int size, float angleX, float angleY, float angleAnim);
+
+    /**
+     * @brief Draw cross of arm length size centred on the display screen
+     * @param size Length of each arm of the cross (default: 10)
+     * 
+     * Example:
+     *   display.drawCenterCross(15);
+     */
+    void drawCenterCross(int size = 10);
 ```
 
 ## Acknowledgements
