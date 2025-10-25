@@ -105,7 +105,6 @@ void GFXDisplay::drawBitmap(int x, int y, int w, int h, const byte *bmp)
   }
 }
 
-
 void GFXDisplay::drawCube3D(int centerX, int centerY, int size, float angleX, float angleY, float angleAnim) {
     float half = size / 2.0f;
     float vertices[8][3] = {
@@ -148,4 +147,12 @@ void GFXDisplay::drawCube3D(int centerX, int centerY, int size, float angleX, fl
         drawLine(projected[edges[i][0]][0], projected[edges[i][0]][1],
                          projected[edges[i][1]][0], projected[edges[i][1]][1]);
     }
+}
+
+void GFXDisplay::drawCenterCross(int size) {
+    int centerX = WIDTH / 2;
+    int centerY = HEIGHT / 2;
+    
+    drawLine(centerX - size, centerY, centerX + size, centerY);
+    drawLine(centerX, centerY - size, centerX, centerY + size);
 }

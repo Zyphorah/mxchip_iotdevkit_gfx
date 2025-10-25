@@ -65,6 +65,11 @@ class GFXDisplay : public OLEDDisplay
     void drawBitmap(int x, int y, int w, int h, const byte *bmp);
 
     void drawCube3D(int centerX, int centerY, int size, float angleX, float angleY, float angleAnim);
+    
+    /**
+     * Draw cross of arm length size centred on the display screen
+     */
+    void drawCenterCross(int size = 10);
 };
 
 #endif
